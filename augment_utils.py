@@ -75,14 +75,14 @@ def add_gaussian_noise(filename):
 def adjust_random_brightness(filename):
     image, boxes, class_labels, _, _ = load_image_and_boxes(filename)
 
-    # 双峰正态分布：50% 概率取 0.7，50% 概率取 1.4
+    # 双峰正态分布：50% 概率取 0.4，50% 概率取 1.8
     if random.random() < 0.5:
-        factor = np.random.normal(loc=0.7, scale=0.1)
+        factor = np.random.normal(loc=0.4, scale=0.1)
     else:
-        factor = np.random.normal(loc=1.4, scale=0.1)
+        factor = np.random.normal(loc=1.8, scale=0.1)
 
     # 限制亮度范围在合理区间
-    factor = max(0.3, min(2.0, factor))
+    factor = max(0.1, min(2.5, factor))
 
     bright = np.clip(image.astype(np.float32) * factor, 0, 255).astype(np.uint8)
 
@@ -94,7 +94,7 @@ def adjust_random_brightness(filename):
 def add_black_rect(filename):
     image, boxes, class_labels, width, height = load_image_and_boxes(filename)
 
-    max_attempts = 10
+    max_attempts = 20
     for _ in range(max_attempts):
         rect_w = random.randint(int(0.3 * width), int(0.5 * width))
         rect_h = random.randint(int(0.3 * height), int(0.5 * height))
@@ -149,9 +149,9 @@ def random_scale_with_padding(filename):
 
     # 双峰正态分布采样 scale
     if random.random() < 0.5:
-        scale_factor = np.random.normal(loc=0.3, scale=0.1)
+        scale_factor = np.random.normal(loc=0.5, scale=0.1)
     else:
-        scale_factor = np.random.normal(loc=1.7, scale=0.1)
+        scale_factor = np.random.normal(loc=1.8, scale=0.1)
 
     # 限制 scale 在合理区间
     scale_factor = max(0.1, min(2.5, scale_factor))
