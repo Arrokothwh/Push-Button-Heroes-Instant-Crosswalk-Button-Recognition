@@ -8,7 +8,6 @@ from albumentations.pytorch import ToTensorV2
 from datetime import datetime
 
 
-
 INPUT_DIR = None
 OUTPUT_DIR = None
 
@@ -41,8 +40,8 @@ def save_augmented(image, boxes, class_labels, filename):
     timestamp = now.strftime("%m%d%H%M%S")
     new_filename = f"{os.path.splitext(filename)[0]}-{hash_code}-{timestamp}"
 
-    image_out_path = os.path.join(OUTPUT_DIR, 'images', new_filename + ".jpg")
-    label_out_path = os.path.join(OUTPUT_DIR, 'labels', new_filename + ".txt")
+    image_out_path = os.path.join(OUTPUT_DIR, 'images/train', new_filename + ".jpg")
+    label_out_path = os.path.join(OUTPUT_DIR, 'labels/train', new_filename + ".txt")
 
     os.makedirs(os.path.dirname(image_out_path), exist_ok=True)
     os.makedirs(os.path.dirname(label_out_path), exist_ok=True)
@@ -149,9 +148,9 @@ def random_scale_with_padding(filename):
 
     # 双峰正态分布采样 scale
     if random.random() < 0.5:
-        scale_factor = np.random.normal(loc=0.5, scale=0.1)
+        scale_factor = np.random.normal(loc=0.6, scale=0.1)
     else:
-        scale_factor = np.random.normal(loc=1.8, scale=0.1)
+        scale_factor = np.random.normal(loc=1.8, scale=0.3)
 
     # 限制 scale 在合理区间
     scale_factor = max(0.1, min(2.5, scale_factor))

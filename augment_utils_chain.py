@@ -40,11 +40,11 @@ def save_augmented(image, boxes, class_labels, filename):
     # hash + 时间戳
     h4 = hashlib.md5(image.tobytes()).hexdigest()[:4]
     ts = datetime.now().strftime("%m%d%H%M%S")
+    subfolder = os.path.dirname(filename)
     new_name = f"{os.path.splitext(filename)[0]}-{h4}{ts}"
 
-    img_out = os.path.join(OUTPUT_DIR, "images", new_name + ".jpg")
-    txt_out = os.path.join(OUTPUT_DIR, "labels", new_name + ".txt")
-
+    img_out = os.path.join(OUTPUT_DIR, "images", subfolder, new_name + ".jpg")
+    txt_out = os.path.join(OUTPUT_DIR, "labels", subfolder, new_name + ".txt")
     os.makedirs(os.path.dirname(img_out), exist_ok=True)
     os.makedirs(os.path.dirname(txt_out), exist_ok=True)
     cv2.imwrite(img_out, image)

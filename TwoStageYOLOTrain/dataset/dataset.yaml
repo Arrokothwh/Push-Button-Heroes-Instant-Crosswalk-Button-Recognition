@@ -1,0 +1,7 @@
+path: D:/CSE493G-Project/TwoStageYOLOTrain/dataset/
+train: images/train
+val: images/val
+test: images/test
+
+names:
+  0: ped_button
