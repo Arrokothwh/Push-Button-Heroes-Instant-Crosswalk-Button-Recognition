@@ -38,7 +38,7 @@ def check_accuracy_final(loader, model, device, out=False):
     
 # Early Stop
 class EarlyStopping:
-    def __init__(self, patience=20, delta=1e-4):
+    def __init__(self, patience=20, delta=1e-3):
         self.patience = patience
         self.delta = delta
         self.best_score = -float('inf') 
@@ -54,14 +54,14 @@ class EarlyStopping:
             if self.counter >= self.patience:
                 self.early_stop = True
 # train method
-def train(model, optimizer, loader_train, loader_val, device, earlystop = True ,epochs=10, dtype=torch.float32):
+def train(model, optimizer, loader_train, loader_val, device, earlystop = True, patience=20, delta = 1e-3, epochs=10, dtype=torch.float32):
     x1, y1, y2, y3 = [], [], [], []
     model = model.to(device=device)
     criterion = nn.BCEWithLogitsLoss()
     cnt = 1
     total_cnt = epochs * len(loader_train)
     if earlystop:
-        early_stopper = EarlyStopping()
+        early_stopper = EarlyStopping(patience=patience, delta=delta)
 
     for e in range(epochs):
         for t, (x, y) in enumerate(loader_train):
@@ -87,7 +87,7 @@ def train(model, optimizer, loader_train, loader_val, device, earlystop = True ,
             print(f"Iter: {cnt}/{total_cnt:<5} |  Loss: {loss.item():<9.6f} |  Train Acc: {acc_train:<7.4f} |  Val Acc: {acc_val:<7.4f}")
 
             # Early stopping check
-            if cnt >= 200 and earlystop:
+            if cnt >= 30 and earlystop:
                 early_stopper(acc_val)
                 if early_stopper.early_stop:
                     print(f"\nEarly stopping triggered at iteration {cnt}, epoch {e}")
@@ -147,7 +147,7 @@ def hyperparameter_search(model_class, arch, loader_train, loader_val, device, e
         optimizer = torch.optim.AdamW(
             [
                 {"params": model.backbone.parameters(), "lr": lr / 10},            
-                {"params": model.classifier.parameters(), "lr": lr * 10},    
+                {"params": model.classifier.parameters(), "lr": lr},    
             ],
             weight_decay=wd,
             betas=betas
@@ -157,7 +157,6 @@ def hyperparameter_search(model_class, arch, loader_train, loader_val, device, e
         _, _, val_accs, _ = data
         final_val_acc = val_accs[-1]
 
-        print(f"Final val acc: {final_val_acc:.4f}")
         results.append((final_val_acc, deepcopy(model), {"lr": lr, "weight_decay": wd, "betas": betas}, data))
 
     # sort based on val acc
