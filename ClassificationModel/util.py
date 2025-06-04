@@ -167,7 +167,7 @@ def hyperparameter_search(model_class, arch, loader_train, loader_val, device, e
     for i, (acc, model, params, _) in enumerate(top_5):
         print(f"Rank {i+1}: Acc={acc:.4f} | Params={params}")
         model_path = f"top{i+1}_model.pt"
-        # torch.save(model.state_dict(), model_path)
+        torch.save(model.state_dict(), model_path)
         print(f" Saved to {model_path}")
 
     # return TOP 5
