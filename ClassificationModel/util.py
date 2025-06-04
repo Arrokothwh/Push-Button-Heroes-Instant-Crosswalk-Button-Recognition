@@ -54,7 +54,7 @@ class EarlyStopping:
             if self.counter >= self.patience:
                 self.early_stop = True
 # train method
-def train(model, optimizer, loader_train, loader_val, device, earlystop = True, patience=20, delta = 1e-3, epochs=10, dtype=torch.float32):
+def train(model, optimizer, loader_train, loader_val, device, earlystop = True, stopsrat = 30, patience=20, delta = 1e-3, epochs=10, dtype=torch.float32):
     x1, y1, y2, y3 = [], [], [], []
     model = model.to(device=device)
     criterion = nn.BCEWithLogitsLoss()
@@ -87,7 +87,7 @@ def train(model, optimizer, loader_train, loader_val, device, earlystop = True, 
             print(f"Iter: {cnt}/{total_cnt:<5} |  Loss: {loss.item():<9.6f} |  Train Acc: {acc_train:<7.4f} |  Val Acc: {acc_val:<7.4f}")
 
             # Early stopping check
-            if cnt >= 30 and earlystop:
+            if cnt >= stopsrat and earlystop:
                 early_stopper(acc_val)
                 if early_stopper.early_stop:
                     print(f"\nEarly stopping triggered at iteration {cnt}, epoch {e}")
@@ -153,7 +153,7 @@ def hyperparameter_search(model_class, arch, loader_train, loader_val, device, e
             betas=betas
         )
 
-        data = train(model, optimizer, loader_train, loader_val, device, epochs=epochs)
+        data = train(model, optimizer, loader_train, loader_val, device, earlystop=False, epochs=epochs)
         _, _, val_accs, _ = data
         final_val_acc = val_accs[-1]
 
@@ -167,7 +167,7 @@ def hyperparameter_search(model_class, arch, loader_train, loader_val, device, e
     for i, (acc, model, params, _) in enumerate(top_5):
         print(f"Rank {i+1}: Acc={acc:.4f} | Params={params}")
         model_path = f"top{i+1}_model.pt"
-        torch.save(model.state_dict(), model_path)
+        # torch.save(model.state_dict(), model_path)
         print(f" Saved to {model_path}")
 
     # return TOP 5
