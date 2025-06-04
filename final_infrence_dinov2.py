@@ -15,7 +15,7 @@ import torch.nn as nn
 YOLO_WEIGHTS = 'TwoStageYOLOTrain/train5v8n/weights/best.pt'
 
 # Path to your Left/Right classifier .pth
-CLS_STATE_DICT = 'Weights/Resnet18Backbone.pth'  
+CLS_STATE_DICT = 'results/Dinov2_w_pretrain/dinov2_small_256_.5_final.pth'  
 
 # Device: use GPU if available, else CPU
 DEVICE = 'cuda:0' if torch.cuda.is_available() else 'cpu'
@@ -32,63 +32,53 @@ yolo_model = YOLO(YOLO_WEIGHTS)  # automatically chooses best backend
 yolo_model.conf = 0.25  # keep detections with ≥25% confidence
 
 # ---------------------------------------------------
-# 3) RECONSTRUCT & LOAD THE ResNet-18 + MLP HEAD
+# 3) RECONSTRUCT & LOAD THE Dinov2BinaryClassifier
 # ---------------------------------------------------
+from torch import nn
+from transformers import AutoImageProcessor, Dinov2Model
 
-print(f"Reconstructing ResNet-18 + MLP head and loading state_dict from: {CLS_STATE_DICT}")
+print(f"Loading DINOv2-based classifier from: {CLS_STATE_DICT}")
 
-# 3a) Create a fresh ResNet-18 backbone (no pretrained weights)
-#     We’ll then attach exactly the same MLP head you used in training.
-classifier = timm.create_model('resnet18', pretrained=False)
+class Dinov2BinaryClassifier(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.backbone = Dinov2Model.from_pretrained("facebook/dinov2-small")
+        self.classifier = nn.Sequential(
+            nn.Linear(384, 256),
+            nn.ReLU(),
+            nn.Dropout(0.2),
+            nn.Linear(256, 1)  # Output: logit
+        )
 
-# 3b) Get the number of input features to the old classifier
-in_features = classifier.get_classifier().in_features
+    def forward(self, x):
+        outputs = self.backbone(pixel_values=x)
+        cls_token = outputs.last_hidden_state[:, 0, :]  # [B, 384]
+        return self.classifier(cls_token)
 
-# 3c) Build your custom MLP head:
-#     nn.Linear(in_features -> 256) → ReLU
-#     → nn.Linear(256 -> 128) → ReLU
-#     → nn.Linear(128 -> 64) → ReLU
-#     → nn.Linear(64 -> 1)   (single logit)
-mlp_head = nn.Sequential(
-    nn.Linear(in_features, 256),
-    nn.ReLU(),
-    nn.Linear(256, 128),
-    nn.ReLU(),
-    nn.Linear(128, 64),
-    nn.ReLU(),
-    nn.Linear(64, 1)
-)
-
-# 3d) Remove the old classifier and attach this new MLP head
-classifier.reset_classifier(0)  # zero out the existing head
-classifier.fc = mlp_head       # set .fc to point to our MLP
-
-# 3e) Load your saved state_dict; this will populate every weight/bias in both backbone + head
+classifier = Dinov2BinaryClassifier()
 state_dict = torch.load(CLS_STATE_DICT, map_location=DEVICE)
 classifier.load_state_dict(state_dict)
-
-# 3f) Move to DEVICE and set eval()
 classifier.to(DEVICE).eval()
 
-print("→ Classifier is ready (ResNet-18 + MLP head).")
+print("→ DINOv2 classifier is ready.")
 
 
 
 
 # ----------------------------------------------------
-# 4) TRANSFORMS FOR THE CLASSIFIER (INPUT: 320×320)
+# 4) TRANSFORMS FOR THE Dinov2BinaryClassifier
 # ----------------------------------------------------
-# Adjust mean/std if your training used different normalization steps.
+from torchvision.transforms import ToPILImage
+from transformers import AutoImageProcessor
 
-cls_transform = transforms.Compose([
-    transforms.ToPILImage(),
-    transforms.Resize((320, 320)),
-    transforms.ToTensor(),
-    transforms.Normalize(
-        mean=[0.485, 0.456, 0.406], 
-        std=[0.229, 0.224, 0.225]
-    )
-])
+image_processor = AutoImageProcessor.from_pretrained("facebook/dinov2-small")
+
+def dinov2_transform(image_bgr):
+    image_rgb = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2RGB)
+    pil_image = ToPILImage()(image_rgb)
+    processed = image_processor(images=pil_image, return_tensors="pt")
+    return processed["pixel_values"].to(DEVICE)  # [1, 3, H, W]
+
 
 
 # ---------------------------------------------------
@@ -138,15 +128,15 @@ def detect_and_classify(frame_bgr: np.ndarray) -> np.ndarray:
             if crop.size == 0:
                 continue
 
-            # 5e) Preprocess crop → classifier (320×320, RGB)
-            crop_rgb = cv2.cvtColor(crop, cv2.COLOR_BGR2RGB)
-            inp_tensor = cls_transform(crop_rgb).unsqueeze(0).to(DEVICE)  # [1,3,320,320]
+            # 5e) Preprocess crop → classifier input
+            inp_tensor = dinov2_transform(crop)
 
-            # 5f) Run classifier: get logits → “Left”/“Right”
+            # 5f) Run classifier: get logit → “Left”/“Right”
             with torch.no_grad():
-                logits = cls_model(inp_tensor)           # [1,2]
-                pred_idx = torch.argmax(logits, dim=1).item()
-                label = "Left" if pred_idx == 0 else "Right"
+                logit = classifier(inp_tensor)  # [1, 1]
+                pred_idx = (torch.sigmoid(logit) > 0.5).item()
+                label = "Right" if pred_idx else "Left"
+
 
             # 5g) Draw bbox + label on annotated image
             color = (0, 255, 0)
@@ -169,7 +159,7 @@ def detect_and_classify(frame_bgr: np.ndarray) -> np.ndarray:
 
 
 def main():
-    cap = cv2.VideoCapture(0)  # 0 = default webcam
+    cap = cv2.VideoCapture(1)  # 0 = default webcam
     if not cap.isOpened():
         print("ERROR: Could not open camera.")
         return
