@@ -36,16 +36,33 @@ def check_accuracy_final(loader, model, device, out=False):
         acc = float(num_correct) / num_samples
         return acc
     
+# Early Stop
+class EarlyStopping:
+    def __init__(self, patience=20, delta=1e-4):
+        self.patience = patience
+        self.delta = delta
+        self.best_score = -float('inf') 
+        self.counter = 0
+        self.early_stop = False
+
+    def __call__(self, val_score):
+        if val_score > self.best_score + self.delta:
+            self.best_score = val_score
+            self.counter = 0
+        else:
+            self.counter += 1
+            if self.counter >= self.patience:
+                self.early_stop = True
 # train method
-def train(model, optimizer, loader_train, loader_val, device, epochs=10, dtype=torch.float32):
-    x1 = list(range(len(loader_train) * epochs))
-    y1 = []
-    y2 = []
-    y3 = []
+def train(model, optimizer, loader_train, loader_val, device, earlystop = True ,epochs=10, dtype=torch.float32):
+    x1, y1, y2, y3 = [], [], [], []
     model = model.to(device=device)
     criterion = nn.BCEWithLogitsLoss()
     cnt = 1
     total_cnt = epochs * len(loader_train)
+    if earlystop:
+        early_stopper = EarlyStopping()
+
     for e in range(epochs):
         for t, (x, y) in enumerate(loader_train):
             model.train()
@@ -58,17 +75,27 @@ def train(model, optimizer, loader_train, loader_val, device, epochs=10, dtype=t
             loss.backward()
             optimizer.step()
 
-            y1.append(loss.item())
-            if (cnt % 2 == 0):
-                acc_val = check_accuracy_final(loader_val, model, device, out=True)
-            else:
-                acc_val = check_accuracy_final(loader_val, model, device)
+            # Check accuracy
+            acc_val = check_accuracy_final(loader_val, model, device, out=(cnt % 2 == 0))
             acc_train = check_accuracy_final(loader_train, model, device)
+            
+            x1.append(cnt)
+            y1.append(loss.item())
             y2.append(acc_val)
             y3.append(acc_train)
+
             print(f"Iter: {cnt}/{total_cnt:<5} |  Loss: {loss.item():<9.6f} |  Train Acc: {acc_train:<7.4f} |  Val Acc: {acc_val:<7.4f}")
+
+            # Early stopping check
+            if cnt >= 200 and earlystop:
+                early_stopper(acc_val)
+                if early_stopper.early_stop:
+                    print(f"\nEarly stopping triggered at iteration {cnt}, epoch {e}")
+                    return (x1, y1, y2, y3)
+
             cnt += 1
     return (x1, y1, y2, y3)
+
 
 # draw it vs train loss + it vs val acc & train acc
 def plotpic(data, use_savgol=True, smooth_window=7):
@@ -109,15 +136,12 @@ def plotpic(data, use_savgol=True, smooth_window=7):
 def hyperparameter_search(model_class, arch, loader_train, loader_val, device, epochs=5):
     lr_list = 10 ** np.random.uniform(-2, -6, (10,))
     wd_list = 10 ** np.random.uniform(-2, -4, (5,))
-    beta_list = [(0.85, 0.99), (0.85, 0.995), (0.9, 0.98), (0.9, 0.99), (0.9, 0.995), (0.9, 0.999),
-    (0.95, 0.98), (0.95, 0.99), (0.95, 0.995), (0.95, 0.999)]
+    beta_list = [(0.9, 0.98), (0.95, 0.999)]
 
-    best_acc = 0.0
-    best_model = None
-    best_params = {}
+    results = []
     
     for lr, wd, betas in itertools.product(lr_list, wd_list, beta_list):
-        print(f"\n Testing AdamW: lr={lr}, wd={wd}, betas={betas}")
+        print(f"\nTesting AdamW: lr={lr:.2e}, wd={wd:.2e}, betas={betas}")
         
         model = model_class(*arch).to(device)
         optimizer = torch.optim.AdamW(
@@ -131,25 +155,25 @@ def hyperparameter_search(model_class, arch, loader_train, loader_val, device, e
 
         data = train(model, optimizer, loader_train, loader_val, device, epochs=epochs)
         _, _, val_accs, _ = data
-
         final_val_acc = val_accs[-1]
-        print(f"Final val acc for lr={lr}, wd={wd}: {final_val_acc:.4f}")
 
-        if final_val_acc > best_acc:
-            best_acc = final_val_acc
-            best_params = {"lr": lr, "weight_decay": wd}
-            best_model = deepcopy(model)
-            best_training_data = data
+        print(f"Final val acc: {final_val_acc:.4f}")
+        results.append((final_val_acc, deepcopy(model), {"lr": lr, "weight_decay": wd, "betas": betas}, data))
 
-    print("\n Best Hyperparameters:")
-    print(best_params)
-    print(f"Best val acc: {best_acc:.4f}")
+    # sort based on val acc
+    results.sort(key=lambda x: x[0], reverse=True)
+    top_5 = results[:5]
 
-    # save model
-    torch.save(best_model.state_dict(), "best_dino_model.pt")
-    print(" Saved best model to best_dino_model.pt")
+    print("\nTop 5 models by validation accuracy:")
+    for i, (acc, model, params, _) in enumerate(top_5):
+        print(f"Rank {i+1}: Acc={acc:.4f} | Params={params}")
+        model_path = f"top{i+1}_model.pt"
+        torch.save(model.state_dict(), model_path)
+        print(f" Saved to {model_path}")
 
-    return best_model, best_params, best_training_data
+    # return TOP 5
+    best_model, best_params, best_training_data = top_5[0][1], top_5[0][2], top_5[0][3]
+    return best_model, best_params, best_training_data, top_5
 
 # show prediction
 def show_predictions_grid(loader, model, device, class_names=None, max_images=12, images_per_row=3):
