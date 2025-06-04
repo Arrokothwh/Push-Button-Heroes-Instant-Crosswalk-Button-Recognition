@@ -128,6 +128,80 @@ def plot_accuracy_curves(
 
     # Display figures (both shown consecutively if two exist)
     plt.show()
+    
+# check acc 
+# def check_accuracy_final(loader, model, device, out=False):
+#     num_correct = 0
+#     num_samples = 0
+#     model.eval()
+#     with torch.no_grad():
+#         for x, y in loader:
+#             x = x.to(device=device, dtype=dtype)
+#             y = y.to(device=device, dtype=dtype).unsqueeze(1)
+#             scores = model(x)
+#             preds = (torch.sigmoid(scores) > 0.5).long()
+
+#             # print prediction
+#             if out:
+#                 pred_probs = torch.sigmoid(scores).flatten().tolist()
+#                 labels = y.flatten().tolist()
+
+#                 pred_str = ', '.join([f"{p * 100:.1f}%" for p in pred_probs])
+#                 label_str = ', '.join(map(str, labels))
+
+#                 print(f"Sample preds : [{pred_str}]")
+#                 print(f"Sample labels: [{label_str}]")
+            
+#             num_correct += (preds == y.long()).sum()
+#             num_samples += preds.size(0)
+#         acc = float(num_correct) / num_samples
+#         return acc
+
+def check_accuracy_final(loader, model, device, out: bool = False):
+    """Compute accuracy for *loader* and optionally print per‑batch predictions.
+
+    Parameters
+    ----------
+    loader : torch.utils.data.DataLoader
+        DataLoader for the split you want to evaluate.
+    model : torch.nn.Module
+        Trained model.
+    device : torch.device
+        CPU/GPU device on which to run the model.
+    out : bool, optional (default = False)
+        If *True*, prints predicted probabilities (%) and labels for each batch.
+
+    Returns
+    -------
+    float
+        Accuracy in the range [0, 1].
+    """
+
+    model.eval()
+    num_correct = 0
+    num_samples = 0
+
+    with torch.no_grad():
+        for x, y in loader:
+            x = x.to(device)
+            y = y.to(device)
+            if y.ndim == 1:
+                y = y.unsqueeze(1)
+
+            scores = model(x)
+            probs = torch.sigmoid(scores)
+            preds = (probs > 0.5).long()
+
+            if out:
+                pred_str = ", ".join(f"{p.item()*100:.1f}%" for p in probs.flatten())
+                label_str = ", ".join(str(int(lbl.item())) for lbl in y.flatten())
+                print(f"Sample preds : [{pred_str}]")
+                print(f"Sample labels: [{label_str}]")
+
+            num_correct += (preds == y.long()).sum().item()
+            num_samples += preds.size(0)
+
+    return num_correct / num_samples
 
 
 # -----------------------------------------------------------------------------
@@ -233,6 +307,7 @@ def train(
 
 __all__ = [
     "evaluate",
+    "check_accuracy_final",
     "plot_accuracy_curves",
     "train",
 ]
