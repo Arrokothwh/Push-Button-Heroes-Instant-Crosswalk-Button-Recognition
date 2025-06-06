@@ -15,7 +15,7 @@ In addition, we explore the use of **synthetic arrow injection** and **feature a
 
 ## 🗂️ Dataset
 
-Our custom dataset contains over 1,000 images collected from diverse intersections. Each sample includes:
+Our custom dataset contains over 1,00 images collected from diverse intersections. Each sample includes:
 
 - Bounding boxes for pedestrian button locations
 - Direction labels: `"left"` or `"right"`
