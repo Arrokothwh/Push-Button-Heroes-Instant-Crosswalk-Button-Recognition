@@ -52,19 +52,13 @@ We also include synthetic arrow images to enhance generalization and interpretab
 
 ## 📊 Results Summary
 
-| Model         | Params (M) | Architecture        | Accuracy (%) | F1 Score (%) |
-|---------------|------------|---------------------|--------------|--------------|
-| ResNet-18     | 11.3       | CNN                 | 92.8         | 92.3         |
-| ResNet-34     | 21.4       | CNN                 | 94.2         | 92.3         |
-| TinyViT       | 20.7       | CNN + Transformer   | 96.3         | 83.3         |
-| ViT-B/16      | 85.5       | Transformer         | 92.8         | 92.3         |
-| DINOv2 Small  | 22.1       | Transformer         | 100.0        | 100.0        |
+| Model                             | Params (M) | Architecture        | Accuracy (%) | F1 Score (%) |
+|----------------------------------|------------|---------------------|--------------|--------------|
+| ResNet-18                        | 11.3       | CNN                 | 92.8         | 92.3         |
+| ResNet-34                        | 21.4       | CNN                 | 94.2         | 92.3         |
+| TinyViT                          | 20.7       | CNN + Transformer   | 96.3         | 83.3         |
+| ViT-B/16                         | 85.5       | Transformer         | 92.8         | 92.3         |
+| DINOv2 Small                     | 22.1       | Transformer         | 100.0        | 100.0        |
+| TinyViT (Attention Correction)   | 20.7       | CNN + Transformer   | 92.3         | 91.0         |
+| DINOv2 Small (Attention Correction) | 22.1    | Transformer         | 92.3         | 91.0         |
 
----
-
-## 🛠️ Installation
-
-```bash
-git clone https://github.com/yourusername/pedestrian-button-classifier.git
-cd pedestrian-button-classifier
-pip install -r requirements.txt
